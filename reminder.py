@@ -2,6 +2,7 @@
 """
 WhatsApp Reminder Otomatis via Fonnte API
 Dijalankan oleh GitHub Actions setiap hari jam 08:00 WIB
+CSV format: separator titik koma (;), tanggal DD-MM (tanpa tahun)
 """
 
 import csv
@@ -16,7 +17,7 @@ from datetime import datetime
 # ============================================================
 FONNTE_TOKEN = os.environ.get("FONNTE_TOKEN", "")
 TARGET_GROUP = os.environ.get("TARGET_GROUP", "")
-CSV_PATH     = "database.csv"
+CSV_PATH     = "Event_Nasional_updated.csv"
 HARI_SEBELUM = 3   # Kirim reminder H-3
 
 logging.basicConfig(
@@ -28,19 +29,23 @@ log = logging.getLogger(__name__)
 
 def load_events(csv_path: str) -> list:
     events = []
-    with open(csv_path, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
+    with open(csv_path, newline="", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f, delimiter=";")
         for row in reader:
             tanggal_str = row.get("Tanggal", "").strip()
             if not tanggal_str:
                 continue
             try:
-                tanggal = datetime.strptime(tanggal_str, "%d-%m-%Y").date()
+                # Format tanggal: DD-MM (tanpa tahun)
+                # Tambahkan tahun berjalan agar bisa dibandingkan
+                tahun_ini = datetime.now().year
+                tanggal = datetime.strptime(f"{tanggal_str}-{tahun_ini}", "%d-%m-%Y").date()
                 events.append({
-                    "no"        : row.get("No", ""),
+                    "no"        : row.get("No.", ""),
                     "nama"      : row.get("Nama Peristiwa / Lokasi Kejadian", "").strip(),
                     "tanggal"   : tanggal,
-                    "keterangan": row.get("Keterangan Singkat", "").strip(),
+                    "deskripsi" : row.get("Deskripsi Event", "").strip(),
+                    "keywords"  : row.get("Keywords Pencarian untuk Patroli", "").strip(),
                 })
             except ValueError:
                 log.warning(f"Format tanggal tidak dikenali: '{tanggal_str}' — dilewati.")
@@ -49,13 +54,14 @@ def load_events(csv_path: str) -> list:
 
 
 def format_message(event: dict, selisih: int) -> str:
-    tanggal_fmt = event["tanggal"].strftime("%d %B %Y")
+    tanggal_fmt = event["tanggal"].strftime("%d %B")
     return (
         f"🔔 *REMINDER H-{selisih}*\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"📌 *{event['nama']}*\n"
         f"📅 Tanggal: {tanggal_fmt}\n"
-        f"📝 {event['keterangan']}\n"
+        f"📝 {event['deskripsi']}\n"
+        f"🔍 *Keywords:* {event['keywords']}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"_Pesan ini dikirim otomatis oleh sistem reminder._"
     )
@@ -101,9 +107,9 @@ def main():
             pesan = format_message(event, selisih)
             if kirim_pesan(pesan):
                 terkirim += 1
-            time.sleep(2)  # jeda agar tidak rate-limit
+            time.sleep(2)
 
-    log.info(f"✅ Selesai. {terkirim} pesan terkirim.")
+    log.info(f"✅ Selesai. {terkirim} pesan terkirim hari ini.")
 
 
 if __name__ == "__main__":

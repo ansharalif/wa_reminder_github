@@ -1,0 +1,27 @@
+name: WhatsApp Reminder Otomatis
+
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+
+jobs:
+  kirim-reminder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependensi
+        run: pip install requests
+
+      - name: Jalankan reminder
+        env:
+          FONNTE_TOKEN: ${{ secrets.FONNTE_TOKEN }}
+          TARGET_GROUP: ${{ secrets.TARGET_GROUP }}
+        run: python reminder.py
